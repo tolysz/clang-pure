@@ -15,8 +15,16 @@ limitations under the License.
 */
 
 #include "stdio.h"
+#include <string>
+#include <iostream>
+
+class Boo {
+
+int bla (){ return 0;}
+};
 
 void foo() {
+  int vvv;
   lol:
   printf("%d", (2 + 2) + (2 * 2));
   goto lol;

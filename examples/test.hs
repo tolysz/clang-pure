@@ -24,15 +24,39 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Monoid
 import Data.Tree
 import Data.Tree
+import qualified Data.Set as S
 
 main = do
   idx <- createIndex
-  tu <- parseTranslationUnit idx "test.c" []
+  tu <- parseTranslationUnit idx "test.c"
+          [ "-I/usr/lib/llvm-3.7/lib/clang/3.7.0/include"
+          , "-I/usr/include/c++/4.9"
+          , "-I/usr/include/x86_64-linux-gnu/c++/4.9"
+          , "-std=c++14"
+          , "-stdlib=libstdc++"
+          ]
   let
     root = translationUnitCursor tu
-    funDecs =
-      root ^..
-        cosmosOf cursorChildrenF
-        . filtered (\c -> cursorKind c == FunctionDecl)
-        . folding (\c -> ( cursorSpelling c, ) <$> (typeSpelling <$> cursorType c))
-  for_ funDecs $ \(f, t) -> putStrLn $ BS.unpack f ++ " :: " ++ BS.unpack t
+    rootF f = root ^.. cosmosOf cursorChildrenF . f
+    decs t = rootF
+        ( filtered (\c -> cursorKind c == t)
+        . folding (\c -> ( cursorSpelling c, ,,,)
+                   <$> (typeSpelling <$> cursorType c) 
+                   <*> (spellingLocation . rangeStart <$> cursorExtent c)
+                   <*> (spellingLocation . rangeEnd   <$> cursorExtent c)
+                   <*> (cursorSpelling <$> cursorReferenced c)
+                  )
+        )
+    descS k j = S.fromList $ map  (\(f, t,s,e,r) -> BS.unpack f ++ j ++ BS.unpack t ++ "@" ++ show (fileName . file $ s) ++ "\n > "++ show r ) (decs k)
+    printS k j = for_ (descS k j)  putStrLn
+  print (root  ^.. cosmosOf cursorChildrenF)
+
+
+  printS FunctionDecl " :>: "
+  printS TypedefDecl  " :: "
+  printS VarDecl " :=: "
+  printS ClassDecl " :~: "
+  printS CXXMethod " :+: "
+
+  print ( root)
+
